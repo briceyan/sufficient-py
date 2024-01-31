@@ -1,73 +1,116 @@
 import importlib
-from html2image import Html2Image
 import inspect
 import json
-from io import BytesIO
-from .frame_context import Action, ActionResult, HtmlText, ImageBinary
-from .frame_app_loader import FrameAppLoader
-from .farcaster_client import FarcasterClient
+import hashlib
 import tempfile
 import os
+from io import BytesIO
+from html2image import Html2Image
+from .frame_context import Action, ActionResult, HtmlView, ImageView, ImageFile
+from .frame_app_loader import FrameAppLoader, FrameProgram
+from .farcaster_client import FarcasterClient
 
 
 class FrameAppRunner:
-    def __init__(self, app, screenshot_dir=None):
-        self._program = FrameAppLoader.load(app)
-        self._screenshot_dir = screenshot_dir if screenshot_dir else tempfile.gettempdir()
-        self._hti = Html2Image(output_path=self._screenshot_dir, size=(640, 336))
+    def __init__(self, app, host, size=None, temp_dir=None, fake=None):
+        if size == None:
+            size = (640, 336)
+        self.program = FrameAppLoader.load(app, host)
+        self.temp_dir = temp_dir if temp_dir else tempfile.gettempdir()
+        self.hti = Html2Image(output_path=self.temp_dir, size=size)
+        self.fake_cast, self.fake_caster = fake if fake else (
+            "0x07fd3fc61dbc5f0fdbdbec3f3fb70ea9a3eb4435", 3)
 
-    def to_picture(self, page, state):
-        action, action_result = self._decode_state(state)
-        print(page, action, action_result)
-        view_result = self._program.excute_view_func(
-            page, action, action_result)
-        if isinstance(view_result, HtmlText):
-            return ImageBinary("image/png", self._html_to_image(view_result.html))
-        elif isinstance(view_result, ImageBinary):
-            return view_result
-        else:
-            raise Exception("unsupported view content")
-
-    def to_frame(self, page, action, action_result):
-
+    def gen_frame_meta(self, page, action, action_result):
         frame = {}
-        state = self._encode_state(action, action_result)
-        image_url = f'{self._program.uri}/{page}/image/{state}'
-        click_url = f'{self._program.uri}/{page}/click'
+        cat, path = self._gen_frame_view_in_advance(
+            page, action, action_result)
+        if cat == "cached":
+            image_url = f'{self.program.uri}/view/{path}'
+        elif cat == "static":
+            image_url = f'{self.program.uri}/static/{path}'
+        click_url = f'{self.program.uri}/{page}/click'
         frame["fc:frame"] = "vNext"
         frame["fc:frame:image"] = image_url
         frame["fc:frame:post_url"] = click_url
-        buttons = self._program.pages[page]["btns"]
+        buttons = self.program.pages[page]["btns"]
         for idx, button in enumerate(buttons):
             frame[f"fc:frame:button:{idx+1}"] = button[0]
         return frame
 
-    def to_open_graph(self):
+    def gen_og_meta(self):
         meta = {}
-        meta["og:title"] = self._program.name
-        meta["og:url"] = self._program.uri
-        meta["og:image"] = self._program.logo
+        meta["og:url"] = self.program.uri
+        meta["og:title"] = self.program.name
+        meta["og:description"] = self.program.description
+        meta["og:image"] = self.program.image
         meta["og:image:type"] = "image/png"
         return meta
 
-    def on_click(self, page, post_data):
-        c = FarcasterClient()
-        if "trustedData" not in post_data:
-            verified = verify_resp["message"]
-        else:
-            verified = c.verify_message(
-                post_data["trustedData"]["messageBytes"])
-        action = Action.from_verified_message(verified)
-        next_page, action_result = self._program.excute_btn_func(page, action)
-        return self.to_frame(next_page, action, action_result)
-
-    def on_start(self):
-        page = self._program.start
-        action = Action.start()
-        og = self.to_open_graph()
-        frame = self.to_frame(page, action, ActionResult())
+    def start(self):
+        page = self.program.start
+        action = Action.default()
+        og = self.gen_og_meta()
+        frame = self.gen_frame_meta(page, action, ActionResult())
         frame |= og
         return frame
+
+    def click(self, page, post_data):
+        if "trustedData" in post_data:
+            c = FarcasterClient()
+            verified = c.hub_verify_message(
+                post_data["trustedData"]["messageBytes"])
+            action = Action.from_verified_message(verified, page)
+        elif "untrustedData" in post_data:
+            d = post_data["untrustedData"]
+            action = Action(d["castId"]["fid"], d["castId"]
+                            ["hash"], d["fid"], d["buttonIndex"], page)
+
+        # fake cast https://warpcast.com/~/developers/frames
+        if action.cast == "0x0000000000000000000000000000000000000001":
+            action.action = post_data["untrustedData"]["buttonIndex"]
+            action.cast = self.fake_cast
+            action.caster = self.fake_caster
+
+        next_page, action_result = self.program.execute_btn_func(page, action)
+        return self.gen_frame_meta(next_page, action, action_result)
+
+    @staticmethod
+    def gen_frame_html(metas, template=None):
+        if not template:
+            template = '''<!DOCTYPE html><html><head>{meta_html}</head><body/></html>'''
+        a = []
+        for (k, v) in metas.items():
+            a.append(FrameAppRunner._meta_tag(k, v))
+        meta_html = "\n".join(a)
+        html = template.format(meta_html=meta_html)
+        return html
+
+    def _gen_frame_view_in_advance(self, page, action, action_result):
+        view = self.program.execute_view_func(page, action, action_result)
+        print(view)
+        if isinstance(view, HtmlView):
+            digest = hashlib.sha256(view.html.encode()).hexdigest()
+            name = f"{digest}.png"
+            path = f"{self.temp_dir}/{digest}.png"
+            if not os.path.exists(path):
+                self._screenshot(view.html, name, css=view.css)
+            return ("cached", name)
+        elif isinstance(view, ImageView):
+            digest = hashlib.sha256(view.content).hexdigest()
+            name = f"{digest}.png"
+            path = f"{self.temp_dir}/{digest}.png"
+            if not os.path.exists(path):
+                with open(path, 'w') as file:
+                    file.write(view.content)
+            return ("cached", name)
+        elif isinstance(view, ImageFile):
+            return ("static", view.path)
+        else:
+            raise Exception("view type not supported")
+
+    def _screenshot(self, html, name, css=None):
+        self.hti.screenshot(html_str=html, save_as=name, css_str=css)
 
     @staticmethod
     def _encode_state(action, action_result):
@@ -80,39 +123,6 @@ class FrameAppRunner:
         ar = ActionResult.decode(ar)
         return a, ar
 
-    def _ogm(self, prop, content):
+    @staticmethod
+    def _meta_tag(prop, content):
         return f'<meta property="{prop}" content="{content}" />'
-
-    def _html_to_image(self, html):
-        bio = BytesIO()
-        tf = tempfile.NamedTemporaryFile(dir=self._screenshot_dir, suffix=".png")
-        base_name = os.path.basename(tf.name)
-        paths = self._hti.screenshot(html_str=html, save_as=base_name)
-        print("tf.name", tf.name)
-        print("paths", paths)
-        return open(paths[0], "rb").read()
-
-
-verify_resp = {
-    "valid": True,
-    "message": {
-        "data": {
-            "type": "MESSAGE_TYPE_FRAME_ACTION",
-            "fid": 21828,
-            "timestamp": 96774342,
-            "network": "FARCASTER_NETWORK_MAINNET",
-            "frameActionBody": {
-                "url": "aHR0cDovL2V4YW1wbGUuY29t",
-                "buttonIndex": 1,
-                "castId": {
-                    "fid": 21828,
-                    "hash": "0x1fd48ddc9d5910046acfa5e1b91d253763e320c3"
-                }
-            }
-        },
-        "hash": "0x230a1291ae8e220bf9173d9090716981402bdd3d",
-        "hashScheme": "HASH_SCHEME_BLAKE3",
-        "signature": "8IyQdIav4cMxFWW3onwfABHHS9IroWer6Lowo16AjL6uZ0rve3TTFhxhhuSOPMTYQ8XsncHc6ca3FUetzALJDA==",
-        "signer": "0x196a70ac9847d59e039d0cfcf0cde1adac12f5fb447bb53334d67ab18246306c"
-    }
-}

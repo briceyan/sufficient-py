@@ -1,29 +1,20 @@
-from sufficient.frames.frame_app_runner import FrameAppRunner
-from sufficient.examples import example, degen
+from sufficient.frames import FrameAppRunner
+from sufficient.examples.gm.frame import app as gm_app
 import os
 
 
 class TestFrameAppRunner:
-    # def test_on_start(self):
-    #     app = FrameAppRunner(example)
-    #     html = app.on_start()
-    #     print(html)
+    def test_main_page_meta(self):
+        app = FrameAppRunner(gm_app, "http://localhost:3000")
+        frame_meta = app.start()
+        html = app.gen_frame_html(frame_meta)
+        print(html)
 
-    # def test_to_picture(self):
-    #     app = FrameAppRunner(example)
-    #     r = app.to_picture(
-    #         "PageHome", "7b2263617374223a20302c2022636173746572223a2022222c20226163746f72223a20302c2022616374696f6e223a20307d_7b7d")
-    #     print(r)
-
-    def test_on_click(self):
-        app = FrameAppRunner(example)
-        r = app.on_click("PageNext", untrusted_data)
-        print(r)
-
-    def test_next_picture(self):
-        app = FrameAppRunner(example)
-        r = app.to_picture("PageNext","7b2263617374223a2022307833363131663331336262393639656634343033353633316563326463626233393532626634613534222c2022636173746572223a203231393138372c20226163746f72223a203231393138372c2022616374696f6e223a20327d_7b7d")
-        print(r)
+    def test_main_page_click_button_1(self):
+        app = FrameAppRunner(gm_app, "http://localhost:3000")
+        frame_meta = app.click("PageHome", untrusted_data)
+        html = app.gen_frame_html(frame_meta)
+        print(html)
 
 
 untrusted_data = {

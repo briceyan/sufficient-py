@@ -1,9 +1,9 @@
 from sufficient.frames.frame_app_loader import FrameAppLoader
-from sufficient.examples import degen
+from sufficient.examples.gm.frame import app
 import os
 
 
 class TestFrameAppLoader:
     def test_load_app(self):
-        app = FrameAppLoader.load(degen)
-        print(app)
+        program = FrameAppLoader.load(app, "http://localhost:3000")
+        print(program)
