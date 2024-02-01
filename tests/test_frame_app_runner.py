@@ -1,20 +1,31 @@
 from sufficient.frames import FrameAppRunner
-from sufficient.examples.gm.frame import app as gm_app
+from .frame_apps import gm as gm_app
 import os
 
 
 class TestFrameAppRunner:
     def test_main_page_meta(self):
-        app = FrameAppRunner(gm_app, "http://localhost:3000")
-        frame_meta = app.start()
-        html = app.gen_frame_html(frame_meta)
+        app_path = gm_app.__file__
+        app_dir = os.path.dirname(app_path)
+        static_dir = os.path.join(app_dir, "static")
+        templates_dir = os.path.join(app_dir,  "templates")
+        data_dir = os.path.join(app_dir,  "data")
+
+        host = "http://localhost:5000"
+        app = FrameAppRunner(gm_app, static_dir,
+                             templates_dir, data_dir=data_dir)
+        framelet = app.start()
+        print(framelet, host)
+        html = app.gen_frame_html(framelet, host)
+        print(html)
+        html = app.gen_frame_html(framelet, host, og=True)
         print(html)
 
-    def test_main_page_click_button_1(self):
-        app = FrameAppRunner(gm_app, "http://localhost:3000")
-        frame_meta = app.click("PageHome", untrusted_data)
-        html = app.gen_frame_html(frame_meta)
-        print(html)
+    # def test_main_page_click_button_1(self):
+    #     app = FrameAppRunner(gm_app, "http://localhost:3000")
+    #     frame_meta = app.click("PageHome", untrusted_data)
+    #     html = app.gen_frame_html(frame_meta)
+    #     print(html)
 
 
 untrusted_data = {

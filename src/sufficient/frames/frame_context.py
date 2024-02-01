@@ -1,4 +1,5 @@
 import json
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 
 class Action:
@@ -89,27 +90,72 @@ class ActionResult:
         return f"ActionResult(data={self.data}, errors={self.errors})"
 
 
-class HtmlView:
-    def __init__(self, html, css=None):
-        self.html = html
-        self.css = css
+class TemplateRender:
+    def __init__(self, templates_dir):
+        loader = FileSystemLoader(searchpath=templates_dir),
+        autoesc = select_autoescape(['xml', 'html', 'svg'])
+        self.env = Environment(loader=loader, autoescape=autoesc)
 
-    def __str__(self):
-        return f"HtmlView(html={len(self.html)}B, css={len(self.css) if self.css else 0}B)"
-
-
-class ImageView:
-    def __init__(self, content_type, content):
-        self.content_type = content_type
-        self.content = content
-
-    def __str__(self):
-        return f"ImageView(content_type={self.content_type}, content={len(self.content)}B)"
+    def render_template(self, name, **kwargs):
+        template = env.get_template(name)
+        return template.render(**kwargs)
 
 
-class ImageFile:
-    def __init__(self, path):
-        self.path = path
+class SvgImageView:
+    def __init__(self, source, data):
+        self.source = source
+        self.data = data
 
-    def __str__(self):
-        return f"ImageFile(path={self.path})"
+    @staticmethod
+    def from_string(content):
+        return SvgImageView("memory", [content])
+
+    @staticmethod
+    def from_file(name):
+        return SvgImageView("file", [name])
+
+    @staticmethod
+    def from_template(name, **kwargs):
+        return SvgImageView("template", [name, kwargs])
+
+    def get_content(self, static_dir, template_render):
+        if self.source == "memory":
+            return self.data[0]
+        elif self.source == "file":
+            return open(f"{static_dir}/{self.data[0]}", "r").read()
+        elif self.source == "template":
+            return template_render.render_template(self.data[0], **self.data[1])
+        else:
+            raise Exception("invalid source type")
+
+
+class BinaryImageView:
+    def __init__(self, source, data):
+        self.source = source
+        self.data = data
+
+    @staticmethod
+    def from_file(name):
+        return BinaryImageView("file", [name])
+
+    @staticmethod
+    def from_bytes(content):
+        return BinaryImageView("memory", [content])
+
+    @staticmethod
+    def from_function(func, **kwargs):
+        return BinaryImageView("function", [func, kwargs])
+
+    def get_content(self, static_dir):
+        if self.source == "memory":
+            return self.data[0]
+        elif self.source == "file":
+            return open(f"{static_dir}/{self.data[0]}", "rb").read()
+        elif self.source == "function":
+            raise Exception("not implemented")
+            # return template_render.render_template(self.data[0], **self.data[1])
+        else:
+            raise Exception("invalid source type")
+
+    # def __str__(self):
+    #     return f"ImageFile(path={self.path})"
