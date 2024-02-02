@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "sufficient"
 dynamic = ["version"]
-description = ''
+description = 'A framework for creating Frame apps in an intuitive and declarative manner'
 readme = "README.md"
 requires-python = ">=3.8"
 license = "MIT"
