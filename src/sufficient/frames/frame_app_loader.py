@@ -18,15 +18,23 @@ class FrameProgram:
     def get_view_func(self, page):
         return self.pages[page]["view"]
 
+    def get_btn_info(self, page, btn_idx):
+        btn_idx_saved, btn_name, btn_func, btn_display_name = self.pages[
+            page]["btns"][btn_idx - 1]
+        if btn_idx_saved != btn_idx:
+            raise Exception("internal error: btn idx mismatch")
+        return btn_idx, btn_name, btn_func, btn_display_name
+
     def execute_view_func(self, page, action, result):
         clz = self.pages[page]["class"]
         func = self.pages[page]["view"]
         return func(clz(), action, result)
 
     def execute_btn_func(self, page, action):
+        btn_idx, btn_name, btn_func, btn_display_name = self.get_btn_info(
+            page, action.action)
+        action.set_source(page, btn_name)
         clz = self.pages[page]["class"]
-        btn_idx = action.action - 1
-        btn_name, btn_func = self.pages[page]["btns"][btn_idx]
         r = btn_func(clz(), action)
         if isinstance(r, tuple):
             next_page, result = r
@@ -44,6 +52,7 @@ class FrameAppLoader:
         image = getattr(app_class, "image")
         uri = getattr(app_class, "uri")
         start = getattr(app_class, "start")
+
         uri = str(uri).format(uri=host)
         image = str(image).format(uri=host)
         pages = FrameAppLoader.compile_pages(app)
@@ -63,8 +72,10 @@ class FrameAppLoader:
                     if not inspect.isfunction(method_object):
                         continue
                     if method_name.startswith("btn_"):
-                        name = inflection.humanize(method_name[4:])
-                        page_buttons.append((name, method_object))
+                        btn_display_name = inflection.humanize(method_name[4:])
+                        btn_idx = len(page_buttons) + 1
+                        page_buttons.append(
+                            (btn_idx, method_name, method_object, btn_display_name))
                     if method_name == "view":
                         page_image = method_object
                 pages[page_name] = {}

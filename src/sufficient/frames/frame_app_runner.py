@@ -43,6 +43,7 @@ class FrameAppRunner:
             action.cast = self.fake_cast
             action.caster = self.fake_caster
 
+        # source will be set inside program.execute_btn_func
         next_page, action_result = self.program.execute_btn_func(page, action)
         return self._gen_frame_meta(next_page, action, action_result)
 
@@ -59,7 +60,7 @@ class FrameAppRunner:
         frame["fc:frame:post_url"] = click_url
         buttons = self.program.pages[page]["btns"]
         for idx, button in enumerate(buttons):
-            frame[f"fc:frame:button:{idx+1}"] = button[0]
+            frame[f"fc:frame:button:{idx+1}"] = button[3]
         return frame
 
     def _warm_frame_view(self, page, action, action_result):

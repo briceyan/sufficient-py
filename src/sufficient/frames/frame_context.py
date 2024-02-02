@@ -1,14 +1,19 @@
+import chevron
 import json
-from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 
 class Action:
-    def __init__(self, cast, caster, actor, action, page=None):
+    def __init__(self, cast, caster, actor, action, page=None, button=None):
         self.caster = caster
         self.cast = cast
         self.actor = actor
         self.action = action
+        self.set_source(page, button)
+
+    def set_source(self, page, button):
         self.page = page
+        self.button = button
+        self.source = f"{page}.{button}" if page and button else None
 
     def __str__(self):
         return f"Action(cast={self.cast}, caster={self.caster}, actor={self.actor}, action={self.action}, page={self.page})"
@@ -59,46 +64,57 @@ class Action:
 
 
 class ActionResult:
-    def __init__(self, data=None, errors=None):
-        self.errors = errors
-        self.data = data
+    def __init__(self, **kwargs):
+        self.__kwargs__ = kwargs
+
+    def __getattr__(self, name):
+        if name != "__kwargs__":
+            return self.__kwargs__[name]
+        else:
+            raise AttributeError()
+
+    def to_kwargs(self):
+        return object.__getattribute__(self, "__kwargs__")
 
     @staticmethod
     def default():
         return ActionResult()
 
-    @staticmethod
-    def decode(hex_data):
-        js_str = bytes.fromhex(hex_data).decode("utf-8")
-        data = json.loads(js_str)
-        ar = ActionResult()
-        if "data" in data:
-            ar.data = data["data"]
-        if "errors" in data:
-            ar.errors = data["errors"]
-        return ar
-
-    def encode(self):
-        data = {}
-        if self.data:
-            data["data"] = self.data
-        if self.errors:
-            data["errors"] = self.errors
-        return json.dumps(data).encode().hex()
-
     def __str__(self):
-        return f"ActionResult(data={self.data}, errors={self.errors})"
+        attrs = [f"{key}={value}" for key, value in sel.kwargs.items()]
+        return f"{self.__class__.__name__}({', '.join(attrs)})"
 
 
-class TemplateRender:
-    def __init__(self, templates_dir):
-        loader = FileSystemLoader(searchpath=templates_dir),
-        autoesc = select_autoescape(['xml', 'html', 'svg'])
-        self.env = Environment(loader=loader, autoescape=autoesc)
+# class ActionResult:
+#     def __init__(self, **kwargs):
+#         self.errors = errors
+#         self.data = data
 
-    def render_template(self, name, **kwargs):
-        template = env.get_template(name)
-        return template.render(**kwargs)
+#     @staticmethod
+#     def default():
+#         return ActionResult()
+
+#     @staticmethod
+#     def decode(hex_data):
+#         js_str = bytes.fromhex(hex_data).decode("utf-8")
+#         data = json.loads(js_str)
+#         ar = ActionResult()
+#         if "data" in data:
+#             ar.data = data["data"]
+#         if "errors" in data:
+#             ar.errors = data["errors"]
+#         return ar
+
+#     def encode(self):
+#         data = {}
+#         if self.data:
+#             data["data"] = self.data
+#         if self.errors:
+#             data["errors"] = self.errors
+#         return json.dumps(data).encode().hex()
+
+#     def __str__(self):
+#         return f"ActionResult(data={self.data}, errors={self.errors})"
 
 
 class SvgImageView:
@@ -115,8 +131,8 @@ class SvgImageView:
         return SvgImageView("file", [name])
 
     @staticmethod
-    def from_template(name, **kwargs):
-        return SvgImageView("template", [name, kwargs])
+    def from_template(name, attr_dict):
+        return SvgImageView("template", [name, attr_dict])
 
     def get_content(self, static_dir, template_render):
         if self.source == "memory":
@@ -124,7 +140,7 @@ class SvgImageView:
         elif self.source == "file":
             return open(f"{static_dir}/{self.data[0]}", "r").read()
         elif self.source == "template":
-            return template_render.render_template(self.data[0], **self.data[1])
+            return template_render.render_template(self.data[0], **self.data[1].to_kwargs())
         else:
             raise Exception("invalid source type")
 
@@ -143,8 +159,8 @@ class BinaryImageView:
         return BinaryImageView("memory", [content])
 
     @staticmethod
-    def from_function(func, **kwargs):
-        return BinaryImageView("function", [func, kwargs])
+    def from_function(func, attr_dict):
+        return BinaryImageView("function", [func, attr_dict])
 
     def get_content(self, static_dir):
         if self.source == "memory":
@@ -159,3 +175,13 @@ class BinaryImageView:
 
     # def __str__(self):
     #     return f"ImageFile(path={self.path})"
+
+
+class TemplateRender:
+    def __init__(self, templates_dir):
+        self.templates_dir = templates_dir
+
+    def render_template(self, template_name, **kwargs):
+        path = f"{self.templates_dir}/{template_name}"
+        with open(path, 'r') as f:
+            return chevron.render(f, kwargs)
