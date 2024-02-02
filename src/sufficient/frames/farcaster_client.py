@@ -59,10 +59,13 @@ class FarcasterClient:
             "accept": "application/json",
             "api_key": self._neynar_api_key
         }
+        print(url)
         resp = requests.get(url, headers=headers)
         if resp.ok:
             json = resp.json()
             return json["result"]["casts"][0]
+        else:
+            print(resp)
         return None
 
     def neynar_validate_frame_action(self, message_bytes_in_hex):

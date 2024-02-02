@@ -33,9 +33,8 @@ class FrameAppRunner:
                 post_data["trustedData"]["messageBytes"])
             action = Action.from_verified_message(verified, page)
         elif "untrustedData" in post_data:
-            d = post_data["untrustedData"]
-            action = Action(d["castId"]["fid"], d["castId"]
-                            ["hash"], d["fid"], d["buttonIndex"], page)
+            untrusted = post_data["untrustedData"]
+            action = Action.from_untrusted_data(untrusted, page)
 
         # fake cast by https://warpcast.com/~/developers/frames
         if action.cast == "0x0000000000000000000000000000000000000001":
@@ -45,7 +44,10 @@ class FrameAppRunner:
 
         # source will be set inside program.execute_btn_func
         next_page, action_result = self.program.execute_btn_func(page, action)
-        return self._gen_frame_meta(next_page, action, action_result)
+        if next_page:
+            return "framelet", self._gen_frame_meta(next_page, action, action_result)
+        else:
+            return "redirection", action_result.redirect_url
 
     def _gen_frame_meta(self, page, action, action_result):
         frame = {}
@@ -60,7 +62,10 @@ class FrameAppRunner:
         frame["fc:frame:post_url"] = click_url
         buttons = self.program.pages[page]["btns"]
         for idx, button in enumerate(buttons):
-            frame[f"fc:frame:button:{idx+1}"] = button[3]
+            if button[1].startswith("goto_"):
+                frame[f"fc:frame:button:{idx+1}:post_redirect"] = button[3]
+            else:
+                frame[f"fc:frame:button:{idx+1}"] = button[3]
         return frame
 
     def _warm_frame_view(self, page, action, action_result):

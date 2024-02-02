@@ -23,6 +23,14 @@ class Action:
         return Action("0x", 0, 0, 0)
 
     @staticmethod
+    def from_untrusted_data(untrusted_data, page):
+        cast = untrusted_data["castId"]["hash"]
+        caster = untrusted_data["castId"]["fid"]
+        actor = untrusted_data["fid"]
+        action = untrusted_data["buttonIndex"]
+        return Action(cast, caster, actor, action, page)
+
+    @staticmethod
     def from_verified_message(message, page):
         cast = message["data"]["frameActionBody"]["castId"]["hash"]
         caster = message["data"]["frameActionBody"]["castId"]["fid"]

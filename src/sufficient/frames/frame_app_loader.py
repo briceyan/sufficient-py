@@ -36,10 +36,16 @@ class FrameProgram:
         action.set_source(page, btn_name)
         clz = self.pages[page]["class"]
         r = btn_func(clz(), action)
-        if isinstance(r, tuple):
-            next_page, result = r
+        if btn_name.startswith("btn_"):
+            if isinstance(r, tuple):
+                next_page, result = r
+            else:
+                next_page, result = r, ActionResult()
+        elif btn_name.startswith("goto_"):
+            redirect_url = r
+            next_page, result = None, ActionResult(redirect_url=redirect_url)
         else:
-            next_page, result = r, ActionResult()
+            raise Exception("internal error: unexpected btn name")
         return next_page, result
 
 
@@ -73,6 +79,11 @@ class FrameAppLoader:
                         continue
                     if method_name.startswith("btn_"):
                         btn_display_name = inflection.humanize(method_name[4:])
+                        btn_idx = len(page_buttons) + 1
+                        page_buttons.append(
+                            (btn_idx, method_name, method_object, btn_display_name))
+                    elif method_name.startswith("goto_"):
+                        btn_display_name = inflection.humanize(method_name[5:])
                         btn_idx = len(page_buttons) + 1
                         page_buttons.append(
                             (btn_idx, method_name, method_object, btn_display_name))
