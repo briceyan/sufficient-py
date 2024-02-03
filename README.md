@@ -15,9 +15,9 @@ pip install sufficient
 
 ## Quick Start
 
-Code snippets here are excerpted from `gm-universe` under repo [frame-app-examples](https://github.com/briceyan/frame-app-examples), you may also want to check it.
+The code below is from [frame-app-boilerplate]("https://github.com/briceyan/frame-app-boilerplate").
 
-1. Create a python project with a directory structure looks like this.
+1. Create a Python project with the following directory structure.
 
 ```pre
 api
@@ -25,17 +25,9 @@ api
 frame
 ├── app.py
 ├── static
-│   ├── features.png
-│   ├── home.png
-│   ├── howitworks.png
-│   ├── howitworks_deploy.png
-│   ├── howitworks_programming.png
-│   └── unexpected.png
+│   └── home.svg
 └── templates
-    ├── features.svg
-    ├── features_casters.svg
-    ├── features_chaindata.svg
-    └── features_reactions.svg
+    └── foo.svg
 ```
 
 2. Define your frame app in frame/app.py.
@@ -46,44 +38,36 @@ from sufficient.frames import *
 
 class App:
     name = "GM Universe"
-    description = "Greetings from your first frame app using sufficient-py"
-    image = "{uri}/static/home.png"
+    description = "A boilerplate for creating frame apps"
+    image = "{uri}/static/home.svg"
     uri = "{uri}"
     start = "PageHome"
 
 
 class PageHome:
     def view(self, action: Action, result: ActionResult):
-        return ImageFile("home.png")
+        return SvgFile("home.svg")
 
-    def btn_explore(self, action: Action):
-        return "PageFeatures"
+    def btn_normal_button(self, action: Action):
+        return "PageNext"
+
+    def goto_redirect_button(self, action: Action):
+        return "https://github.com/briceyan/frame-app-boilerplate"
+
+    def input_input_text(self, action: Action):
+        # wip
+        pass
 
 
-class PageFeatures:
+class PageNext:
     def view(self, action: Action, result: ActionResult):
-        if "PageHome.btn_explore" == action.source:
-            return ImageFile("features.png")
-        elif "PageFeatures.btn_casters" == action.source:
-            return SvgTemplate("features_casters.svg", result)
-        elif "PageFeatures.btn_reactions" == action.source:
-            return SvgTemplate("features_reactions.svg", result)
-        elif "PageFeatures.btn_chain_data" == action.source:
-            return SvgTemplate("features_chaindata.svg", result)
-        else:
-            return ImageFile("unexpected.png")
+        return SvgTemplate("foo.svg", title="PageNext", content="hello")
 
-    def btn_casters(self, action: Action):
-        c = FarcasterClient()
-        users = c.neynar_get_users_bulk([action.actor, action.caster])
-        actor_pfp = users[0]["pfp_url"]
-        actor_name = users[0]["display_name"]
-        caster_pfp = users[1]["pfp_url"]
-        caster_name = users[1]["display_name"]
-        return "PageFeatures", ActionResult(actor_name=actor_name,
-                                            actor_pfp=actor_pfp,
-                                            caster_name=caster_name,
-                                            caster_pfp=caster_pfp)
+    def btn_prev(self, action: Action):
+        return "PageHome"
+
+    def btn_refresh(self, action: Action):
+        return "PageNext"
 
 ```
 
@@ -152,7 +136,7 @@ python -m flask --app api.index run
 5. Use ngrok to make your local server publically accessible
 
 ```console
-ngrok http http://localhost:5000
+ngrok http 5000 --scheme http,https
 ```
 
 6. Validate your frame app
