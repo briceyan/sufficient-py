@@ -62,10 +62,9 @@ class FrameAppRunner:
         frame["fc:frame:post_url"] = click_url
         buttons = self.program.pages[page]["btns"]
         for idx, button in enumerate(buttons):
+            frame[f"fc:frame:button:{idx+1}"] = button[3]
             if button[1].startswith("goto_"):
-                frame[f"fc:frame:button:{idx+1}:post_redirect"] = button[3]
-            else:
-                frame[f"fc:frame:button:{idx+1}"] = button[3]
+                frame[f"fc:frame:button:{idx+1}:action"] = "post_redirect"
         return frame
 
     def _warm_frame_view(self, page, action, action_result):
