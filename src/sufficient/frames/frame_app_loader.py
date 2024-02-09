@@ -74,6 +74,7 @@ class FrameAppLoader:
             if inspect.isclass(page_class) and page_name.startswith("Page"):
                 page_buttons = []
                 page_image = None
+                input_label = None
                 for method_name, method_object in FrameAppLoader.get_members_in_order(page_class):
                     if not inspect.isfunction(method_object):
                         continue
@@ -87,11 +88,14 @@ class FrameAppLoader:
                         btn_idx = len(page_buttons) + 1
                         page_buttons.append(
                             (btn_idx, method_name, method_object, btn_display_name))
-                    if method_name == "view":
+                    elif method_name.startswith("input_"):
+                        input_label = inflection.humanize(method_name[6:])
+                    elif method_name == "view":
                         page_image = method_object
                 pages[page_name] = {}
                 pages[page_name]["class"] = page_class
                 pages[page_name]["btns"] = page_buttons
+                pages[page_name]["input"] = input_label
                 pages[page_name]["view"] = page_image
         return pages
 

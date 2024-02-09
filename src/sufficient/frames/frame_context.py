@@ -3,11 +3,12 @@ import json
 
 
 class Action:
-    def __init__(self, cast, caster, actor, action, page=None, button=None):
+    def __init__(self, cast, caster, actor, action, page=None, button=None, input_text=None):
         self.caster = caster
         self.cast = cast
         self.actor = actor
         self.action = action
+        self.input_text = input_text
         self.set_source(page, button)
 
     def set_source(self, page, button):
@@ -28,14 +29,17 @@ class Action:
         caster = untrusted_data["castId"]["fid"]
         actor = untrusted_data["fid"]
         action = untrusted_data["buttonIndex"]
+        input_text = untrusted_data["inputText"] if "inputText" in untrusted_data else None
         return Action(cast, caster, actor, action, page)
 
     @staticmethod
     def from_verified_message(message, page):
-        cast = message["data"]["frameActionBody"]["castId"]["hash"]
-        caster = message["data"]["frameActionBody"]["castId"]["fid"]
+        b = message["data"]["frameActionBody"]
+        cast = b["castId"]["hash"]
+        caster = b["castId"]["fid"]
         actor = message["data"]["fid"]
-        action = message["data"]["frameActionBody"]["buttonIndex"]
+        action = b["buttonIndex"]
+        input_text = b["inputText"] if "inputText" in b else None
         return Action(cast, caster, actor, action, page)
 
     # @staticmethod
